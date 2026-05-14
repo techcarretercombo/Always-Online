@@ -257,15 +257,40 @@ export default function FeedPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  function compressImage(file: File, maxPx = 1200, quality = 0.75): Promise<string> {
+    return new Promise((resolve) => {
+      if (file.type.startsWith("video/")) {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+        return;
+      }
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > maxPx || height > maxPx) {
+          const ratio = Math.min(maxPx / width, maxPx / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = url;
+    });
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const result = ev.target?.result as string;
-        setMediaUrls(prev => [...prev, result]);
-      };
-      reader.readAsDataURL(file);
+    files.forEach(async file => {
+      const result = await compressImage(file);
+      setMediaUrls(prev => [...prev, result]);
     });
     e.target.value = "";
   }

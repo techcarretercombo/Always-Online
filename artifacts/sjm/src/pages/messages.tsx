@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
 import {
   useGetMe, useListConversations, useListMessages, useSendMessage,
@@ -14,10 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle
 } from "@/components/ui/dialog";
-import { Send, MessageCircle, Search, MoreHorizontal, Phone, Video, Edit, X } from "lucide-react";
+import { Send, MessageCircle, Search, MoreHorizontal, Phone, Video, Edit } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { CallOverlay } from "@/components/call/CallOverlay";
 
 function ConversationItem({ conv, active, onClick, me }: { conv: any; active: boolean; onClick: () => void; me: any }) {
   const other = conv.participants?.find((p: any) => p.id !== me?.id) ?? conv.participants?.[0];
@@ -73,6 +74,16 @@ export default function MessagesPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Call state
+  const [activeCall, setActiveCall] = useState<{
+    peer: { id: number; fullName: string; avatarUrl?: string | null };
+    mode: "audio" | "video";
+    direction: "outgoing" | "incoming";
+    offer?: RTCSessionDescriptionInit;
+  } | null>(null);
+  const incomingPollRef = useRef<number | null>(null);
+  const incomingSinceRef = useRef(Date.now());
+
   const { data: messages, isLoading: msgsLoading } = useListMessages(
     activeConvId ?? 0,
     { query: { enabled: !!activeConvId, queryKey: getListMessagesQueryKey(activeConvId ?? 0) } }
@@ -85,11 +96,67 @@ export default function MessagesPage() {
     { query: { enabled: userSearch.length > 1, queryKey: getListUsersQueryKey({ search: userSearch }) } }
   );
 
+  // Poll for incoming calls when no active call
+  useEffect(() => {
+    if (!me?.id || activeCall) return;
+    incomingSinceRef.current = Date.now() - 2000;
+    incomingPollRef.current = window.setInterval(async () => {
+      if (activeCall) return;
+      const token = localStorage.getItem("sjm_token");
+      const res = await fetch(`/api/signals?since=${incomingSinceRef.current}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const sigs: { id: string; from: number; type: string; payload: any }[] = await res.json();
+      incomingSinceRef.current = Date.now();
+      for (const sig of sigs) {
+        if (sig.type === "ring") {
+          // Incoming call ring — look up who's calling
+          const callerName = sig.payload?.callerName ?? "Someone";
+          const callerAvatar = sig.payload?.callerAvatar ?? null;
+          const mode = sig.payload?.mode ?? "audio";
+          // Delete ring signal
+          await fetch(`/api/signals/${sig.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+          // Get the offer signal
+          const offerRes = await fetch(`/api/signals?from=${sig.from}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          let offer: RTCSessionDescriptionInit | undefined;
+          if (offerRes.ok) {
+            const offerSigs = await offerRes.json();
+            const offerSig = offerSigs.find((s: any) => s.type === "offer");
+            if (offerSig) {
+              offer = offerSig.payload;
+              await fetch(`/api/signals/${offerSig.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            }
+          }
+          setActiveCall({
+            peer: { id: sig.from, fullName: callerName, avatarUrl: callerAvatar },
+            mode,
+            direction: "incoming",
+            offer,
+          });
+          break;
+        }
+      }
+    }, 2000);
+    return () => { if (incomingPollRef.current) clearInterval(incomingPollRef.current); };
+  }, [me?.id, activeCall]);
+
   useEffect(() => {
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  function startCall(mode: "audio" | "video") {
+    if (!otherPerson || !me) return;
+    setActiveCall({
+      peer: { id: otherPerson.id, fullName: otherPerson.fullName, avatarUrl: otherPerson.avatarUrl },
+      mode,
+      direction: "outgoing",
+    });
+  }
 
   function handleSend() {
     if (!text.trim() || !activeConvId) return;
@@ -215,8 +282,8 @@ export default function MessagesPage() {
                 <p className="text-xs text-muted-foreground">Active now</p>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Phone size={16} /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Video size={16} /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" title="Voice call" onClick={() => startCall("audio")}><Phone size={16} /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" title="Video call" onClick={() => startCall("video")}><Video size={16} /></Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreHorizontal size={16} /></Button>
               </div>
             </div>
@@ -349,6 +416,18 @@ export default function MessagesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Active call overlay */}
+      {activeCall && me && (
+        <CallOverlay
+          me={{ id: me.id, fullName: me.fullName, avatarUrl: me.avatarUrl }}
+          peer={activeCall.peer}
+          mode={activeCall.mode}
+          direction={activeCall.direction}
+          incomingOffer={activeCall.offer}
+          onEnd={() => setActiveCall(null)}
+        />
+      )}
     </>
   );
 }

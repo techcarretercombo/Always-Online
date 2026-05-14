@@ -56,18 +56,32 @@ export default function ProfilePage() {
     setEditOpen(true);
   }
 
-  function readFileAsDataURL(file: File): Promise<string> {
+  function compressImage(file: File, maxPx = 800, quality = 0.75): Promise<string> {
     return new Promise((resolve) => {
-      const r = new FileReader();
-      r.onload = e => resolve(e.target?.result as string);
-      r.readAsDataURL(file);
+      const img = new window.Image();
+      const blobUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(blobUrl);
+        let { width, height } = img;
+        if (width > maxPx || height > maxPx) {
+          const ratio = Math.min(maxPx / width, maxPx / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = blobUrl;
     });
   }
 
   async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = await readFileAsDataURL(file);
+    const url = await compressImage(file, 400, 0.8);
     setEditAvatar(url);
     e.target.value = "";
   }
@@ -75,7 +89,7 @@ export default function ProfilePage() {
   async function handleCoverFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = await readFileAsDataURL(file);
+    const url = await compressImage(file, 1200, 0.75);
     setEditCover(url);
     e.target.value = "";
   }

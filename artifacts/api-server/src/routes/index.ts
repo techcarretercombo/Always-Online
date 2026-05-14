@@ -12,6 +12,7 @@ import marketplaceRouter from "./marketplace";
 import searchRouter from "./search";
 import statsRouter from "./stats";
 import adminRouter from "./admin";
+import signalsRouter from "./signals";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(marketplaceRouter);
 router.use(searchRouter);
 router.use(statsRouter);
 router.use(adminRouter);
+router.use("/signals", signalsRouter);
 
 export default router;
