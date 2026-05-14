@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect } from "react";
 import { useRoute } from "wouter";
-import { useGetMe, useListConversations, useListMessages, useSendMessage, useCreateConversation, getListMessagesQueryKey, getListConversationsQueryKey } from "@workspace/api-client-react";
+import {
+  useGetMe, useListConversations, useListMessages, useSendMessage,
+  useCreateConversation, useListUsers, getListUsersQueryKey,
+  getListMessagesQueryKey, getListConversationsQueryKey
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Send, MessageCircle, Search, MoreHorizontal, Phone, Video } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
+import { Send, MessageCircle, Search, MoreHorizontal, Phone, Video, Edit, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 function ConversationItem({ conv, active, onClick, me }: { conv: any; active: boolean; onClick: () => void; me: any }) {
   const other = conv.participants?.find((p: any) => p.id !== me?.id) ?? conv.participants?.[0];
@@ -52,30 +60,6 @@ function ConversationItem({ conv, active, onClick, me }: { conv: any; active: bo
   );
 }
 
-function MessageBubble({ msg, me }: { msg: any; me: any }) {
-  const isMe = msg.senderId === me?.id;
-  return (
-    <div className={cn("flex gap-2 items-end", isMe ? "flex-row-reverse" : "")}>
-      {!isMe && (
-        <Avatar className="w-7 h-7 shrink-0 mb-0.5">
-          <AvatarImage src={msg.sender?.avatarUrl} />
-          <AvatarFallback className="text-xs">{msg.sender?.fullName?.charAt(0)}</AvatarFallback>
-        </Avatar>
-      )}
-      <div
-        className={cn(
-          "max-w-xs rounded-2xl px-3.5 py-2 text-sm shadow-sm",
-          isMe
-            ? "sjm-gradient text-white rounded-br-sm"
-            : "bg-card border border-border rounded-bl-sm"
-        )}
-      >
-        {msg.content}
-      </div>
-    </div>
-  );
-}
-
 export default function MessagesPage() {
   const [, params] = useRoute("/messages/:id");
   const { data: me } = useGetMe();
@@ -84,13 +68,22 @@ export default function MessagesPage() {
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const { data: messages, isLoading: msgsLoading } = useListMessages(
     activeConvId ?? 0,
     { query: { enabled: !!activeConvId, queryKey: getListMessagesQueryKey(activeConvId ?? 0) } }
   );
   const sendMessage = useSendMessage();
+  const createConversation = useCreateConversation();
+
+  const { data: userResults } = useListUsers(
+    { search: userSearch },
+    { query: { enabled: userSearch.length > 1, queryKey: getListUsersQueryKey({ search: userSearch }) } }
+  );
 
   useEffect(() => {
     if (bottomRef.current) {
@@ -109,6 +102,22 @@ export default function MessagesPage() {
           queryClient.invalidateQueries({ queryKey: getListMessagesQueryKey(activeConvId!) });
           queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
         },
+        onError: () => toast({ title: "Failed to send message", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleNewChat(user: any) {
+    createConversation.mutate(
+      { data: { participantIds: [user.id], isGroup: false } },
+      {
+        onSuccess: (conv: any) => {
+          queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
+          setActiveConvId(conv.id);
+          setNewChatOpen(false);
+          setUserSearch("");
+        },
+        onError: () => toast({ title: "Could not start conversation", variant: "destructive" }),
       }
     );
   }
@@ -125,111 +134,152 @@ export default function MessagesPage() {
   const msgList = [...(messages ?? [])].reverse();
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden">
-      {/* Sidebar */}
-      <div className={cn(
-        "w-full lg:w-80 xl:w-96 border-r border-border flex flex-col bg-sidebar shrink-0",
-        activeConvId ? "hidden lg:flex" : "flex"
-      )}>
-        <div className="p-4 border-b border-border">
-          <h1 className="font-bold text-lg mb-3">Messages</h1>
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search conversations..."
-              className="pl-9 h-9 text-sm"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {convsLoading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3">
-                <Skeleton className="w-11 h-11 rounded-full shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <Skeleton className="w-24 h-3.5" />
-                  <Skeleton className="w-32 h-3" />
-                </div>
-              </div>
-            ))
-          ) : filteredConvs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-              <MessageCircle size={36} className="mb-3 opacity-30" />
-              <p className="font-medium text-sm">No conversations yet</p>
-              <p className="text-xs">Start chatting with someone</p>
+    <>
+      <div className="flex h-screen max-h-screen overflow-hidden">
+        {/* Sidebar */}
+        <div className={cn(
+          "w-full lg:w-80 xl:w-96 border-r border-border flex flex-col bg-sidebar shrink-0",
+          activeConvId ? "hidden lg:flex" : "flex"
+        )}>
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="font-bold text-lg">Messages</h1>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                title="New conversation"
+                onClick={() => setNewChatOpen(true)}
+              >
+                <Edit size={16} />
+              </Button>
             </div>
-          ) : (
-            filteredConvs.map((conv: any) => (
-              <ConversationItem
-                key={conv.id}
-                conv={conv}
-                active={conv.id === activeConvId}
-                onClick={() => setActiveConvId(conv.id)}
-                me={me}
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search conversations..."
+                className="pl-9 h-9 text-sm"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
               />
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Chat area */}
-      {activeConvId ? (
-        <div className={cn("flex-1 flex flex-col", !activeConvId ? "hidden lg:flex" : "flex")}>
-          {/* Chat header */}
-          <div className="px-4 h-14 border-b border-border flex items-center gap-3 bg-sidebar">
-            <button className="lg:hidden text-muted-foreground mr-1" onClick={() => setActiveConvId(null)}>←</button>
-            <Avatar className="w-9 h-9">
-              <AvatarImage src={otherPerson?.avatarUrl ?? undefined} />
-              <AvatarFallback>{otherPerson?.fullName?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate">{activeConv?.isGroup ? (activeConv.groupName ?? "") : otherPerson?.fullName}</p>
-              <p className="text-xs text-muted-foreground">Active now</p>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Phone size={16} /></Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Video size={16} /></Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreHorizontal size={16} /></Button>
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-            {msgsLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className={cn("flex gap-2", i % 2 === 0 ? "" : "flex-row-reverse")}>
-                  <Skeleton className="w-7 h-7 rounded-full shrink-0" />
-                  <Skeleton className="w-48 h-9 rounded-2xl" />
+          <div className="flex-1 overflow-y-auto">
+            {convsLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <Skeleton className="w-11 h-11 rounded-full shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="w-24 h-3.5" />
+                    <Skeleton className="w-32 h-3" />
+                  </div>
                 </div>
               ))
-            ) : msgList.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-                No messages yet. Say hello!
+            ) : filteredConvs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                <MessageCircle size={36} className="mb-3 opacity-30" />
+                <p className="font-medium text-sm">No conversations yet</p>
+                <p className="text-xs mb-3">Start chatting with someone</p>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setNewChatOpen(true)}>
+                  <Edit size={13} />
+                  New message
+                </Button>
               </div>
             ) : (
-              msgList.map((msg: any) => (
-                <MessageBubble key={msg.id} msg={msg} me={me} />
+              filteredConvs.map((conv: any) => (
+                <ConversationItem
+                  key={conv.id}
+                  conv={conv}
+                  active={conv.id === activeConvId}
+                  onClick={() => setActiveConvId(conv.id)}
+                  me={me}
+                />
               ))
             )}
-            <div ref={bottomRef} />
           </div>
+        </div>
 
-          {/* Input */}
-          <div className="p-3 border-t border-border bg-sidebar">
-            <div className="flex items-center gap-2">
+        {/* Chat area */}
+        {activeConvId ? (
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Chat header */}
+            <div className="px-4 h-14 border-b border-border flex items-center gap-3 bg-sidebar">
+              <button className="lg:hidden text-muted-foreground mr-1" onClick={() => setActiveConvId(null)}>←</button>
+              <Avatar className="w-9 h-9">
+                <AvatarImage src={otherPerson?.avatarUrl ?? undefined} />
+                <AvatarFallback>{otherPerson?.fullName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{activeConv?.isGroup ? (activeConv.groupName ?? "") : otherPerson?.fullName}</p>
+                <p className="text-xs text-muted-foreground">Active now</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Phone size={16} /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Video size={16} /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreHorizontal size={16} /></Button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              {msgsLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                    <Skeleton className="h-9 w-36 rounded-2xl" />
+                  </div>
+                ))
+              ) : msgList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <MessageCircle size={36} className="mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No messages yet</p>
+                  <p className="text-xs">Say hello!</p>
+                </div>
+              ) : (
+                msgList.map((msg: any) => {
+                  const isOwn = msg.senderId === me?.id;
+                  return (
+                    <div key={msg.id} className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse" : ""}`}>
+                      {!isOwn && (
+                        <Avatar className="w-7 h-7 shrink-0">
+                          <AvatarImage src={msg.sender?.avatarUrl} />
+                          <AvatarFallback className="text-xs">{msg.sender?.fullName?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className={`max-w-[70%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
+                        isOwn
+                          ? "bg-primary text-primary-foreground rounded-br-sm"
+                          : "bg-muted text-foreground rounded-bl-sm"
+                      }`}>
+                        {msg.content}
+                        <div className={`text-[10px] mt-0.5 ${isOwn ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                          {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: false })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            <div className="px-4 py-3 border-t border-border flex items-center gap-2 bg-sidebar">
               <Input
+                className="flex-1 rounded-full bg-muted border-0 h-10 px-4 text-sm"
                 placeholder="Type a message..."
-                className="flex-1 rounded-full text-sm h-10"
                 value={text}
                 onChange={e => setText(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
               />
               <Button
                 size="icon"
-                className="h-10 w-10 rounded-full shrink-0"
+                className="rounded-full h-10 w-10 shrink-0"
                 onClick={handleSend}
                 disabled={!text.trim() || sendMessage.isPending}
               >
@@ -237,16 +287,68 @@ export default function MessagesPage() {
               </Button>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 hidden lg:flex items-center justify-center text-muted-foreground">
-          <div className="text-center">
-            <MessageCircle size={48} className="mx-auto mb-3 opacity-20" />
+        ) : (
+          <div className="flex-1 hidden lg:flex flex-col items-center justify-center text-muted-foreground gap-3">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+              <MessageCircle size={28} className="opacity-40" />
+            </div>
             <p className="font-medium">Select a conversation</p>
-            <p className="text-sm">Choose from your messages on the left</p>
+            <p className="text-sm">Or start a new one</p>
+            <Button variant="outline" size="sm" className="gap-1.5 mt-2" onClick={() => setNewChatOpen(true)}>
+              <Edit size={13} />
+              New message
+            </Button>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* New Chat Dialog */}
+      <Dialog open={newChatOpen} onOpenChange={setNewChatOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New Message</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search people..."
+                className="pl-9"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {userSearch.length > 1 && (userResults ?? []).length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-4">No users found</p>
+              )}
+              {(userResults ?? [])
+                .filter((u: any) => u.id !== me?.id)
+                .map((u: any) => (
+                  <button
+                    key={u.id}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-left"
+                    onClick={() => handleNewChat(u)}
+                    disabled={createConversation.isPending}
+                  >
+                    <Avatar className="w-9 h-9 shrink-0">
+                      <AvatarImage src={u.avatarUrl ?? undefined} />
+                      <AvatarFallback>{u.fullName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{u.fullName}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{u.username}</p>
+                    </div>
+                  </button>
+                ))}
+              {userSearch.length <= 1 && (
+                <p className="text-center text-xs text-muted-foreground py-6">Type at least 2 characters to search</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

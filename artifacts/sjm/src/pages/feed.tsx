@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useGetMe, useListPosts, useListStories, useCreatePost, useGetFeedSummary, useLikePost, useCreateStory, getListPostsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +13,8 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import {
   Heart, MessageCircle, Share2, Image, Video, Smile,
-  Plus, ThumbsUp, Laugh, Eye, Frown, Angry, HeartHandshake,
-  MoreHorizontal, Bookmark
+  Plus, ThumbsUp, Laugh, Eye, Frown, Angry,
+  MoreHorizontal, Bookmark, X, Upload
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -159,7 +160,11 @@ function PostCard({ post, me }: { post: any; me: any }) {
         {post.mediaUrls?.length > 0 && (
           <div className={`${post.mediaUrls.length === 1 ? "" : "grid grid-cols-2 gap-0.5"}`}>
             {post.mediaUrls.slice(0, 4).map((url: string, i: number) => (
-              <img key={i} src={url} alt="" className="w-full object-cover max-h-80" />
+              url.match(/\.(mp4|webm|mov)$/i) ? (
+                <video key={i} src={url} controls className="w-full max-h-80 object-cover" />
+              ) : (
+                <img key={i} src={url} alt="" className="w-full object-cover max-h-80" />
+              )
             ))}
           </div>
         )}
@@ -245,19 +250,65 @@ export default function FeedPage() {
   const queryClient = useQueryClient();
   const [postText, setPostText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [mediaInputVal, setMediaInputVal] = useState("");
+  const [showMediaInput, setShowMediaInput] = useState(false);
+  const [mediaType, setMediaType] = useState<"image" | "video">("image");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  function handlePost() {
-    if (!postText.trim()) return;
-    createPost.mutate({ data: { type: "text", content: postText.trim(), audience: "public" } }, {
-      onSuccess: () => {
-        setPostText("");
-        setPosting(false);
-        queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
-        toast({ title: "Post shared!" });
-      },
-      onError: () => toast({ title: "Failed to post", variant: "destructive" }),
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const result = ev.target?.result as string;
+        setMediaUrls(prev => [...prev, result]);
+      };
+      reader.readAsDataURL(file);
     });
+    e.target.value = "";
+  }
+
+  function addMediaUrl() {
+    const url = mediaInputVal.trim();
+    if (!url) return;
+    setMediaUrls(prev => [...prev, url]);
+    setMediaInputVal("");
+  }
+
+  function removeMedia(i: number) {
+    setMediaUrls(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  function handlePost() {
+    if (!postText.trim() && mediaUrls.length === 0) return;
+    const type = mediaUrls.length > 0
+      ? (mediaUrls[0].match(/\.(mp4|webm|mov)$/i) || mediaUrls[0].startsWith("data:video") ? "video" : "photo")
+      : "text";
+    createPost.mutate(
+      { data: { type: type as any, content: postText.trim(), audience: "public", mediaUrls } },
+      {
+        onSuccess: () => {
+          setPostText("");
+          setMediaUrls([]);
+          setMediaInputVal("");
+          setShowMediaInput(false);
+          setPosting(false);
+          queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
+          toast({ title: "Post shared!" });
+        },
+        onError: () => toast({ title: "Failed to post", variant: "destructive" }),
+      }
+    );
+  }
+
+  function openComposer(withMedia?: "image" | "video") {
+    setPosting(true);
+    if (withMedia) {
+      setMediaType(withMedia);
+      setShowMediaInput(true);
+    }
   }
 
   return (
@@ -290,15 +341,96 @@ export default function FeedPage() {
                     onChange={e => setPostText(e.target.value)}
                     autoFocus
                   />
+
+                  {/* Media previews */}
+                  {mediaUrls.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {mediaUrls.map((url, i) => (
+                        <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
+                          {url.match(/\.(mp4|webm|mov)$/i) || url.startsWith("data:video") ? (
+                            <video src={url} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                          )}
+                          <button
+                            className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80"
+                            onClick={() => removeMedia(i)}
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Media input area */}
+                  {showMediaInput && (
+                    <div className="rounded-lg border border-dashed border-border p-3 space-y-2 bg-muted/30">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {mediaType === "video" ? "Add video" : "Add photo"}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload size={13} />
+                          Upload file
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept={mediaType === "video" ? "video/*" : "image/*"}
+                          multiple={mediaType === "image"}
+                          className="hidden"
+                          onChange={handleFileChange}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Or paste URL here..."
+                          className="h-8 text-xs"
+                          value={mediaInputVal}
+                          onChange={e => setMediaInputVal(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && addMediaUrl()}
+                        />
+                        <Button size="sm" variant="secondary" className="h-8 text-xs shrink-0" onClick={addMediaUrl}>
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-muted-foreground">
-                      <Button variant="ghost" size="icon" className="h-8 w-8"><Image size={16} /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8"><Video size={16} /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8"><Smile size={16} /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-green-500"
+                        title="Add photo"
+                        onClick={() => { setMediaType("image"); setShowMediaInput(v => !v); }}
+                      >
+                        <Image size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-blue-500"
+                        title="Add video"
+                        onClick={() => { setMediaType("video"); setShowMediaInput(v => !v); }}
+                      >
+                        <Video size={16} />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-yellow-500">
+                        <Smile size={16} />
+                      </Button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => setPosting(false)}>Cancel</Button>
-                      <Button size="sm" onClick={handlePost} disabled={!postText.trim() || createPost.isPending}>
+                      <Button variant="ghost" size="sm" onClick={() => { setPosting(false); setMediaUrls([]); setShowMediaInput(false); }}>Cancel</Button>
+                      <Button size="sm" onClick={handlePost} disabled={(!postText.trim() && mediaUrls.length === 0) || createPost.isPending}>
                         Post
                       </Button>
                     </div>
@@ -307,7 +439,7 @@ export default function FeedPage() {
               ) : (
                 <button
                   className="w-full text-left px-4 py-2.5 rounded-full bg-muted text-muted-foreground text-sm hover:bg-muted/80 transition-colors"
-                  onClick={() => setPosting(true)}
+                  onClick={() => openComposer()}
                 >
                   What's on your mind, {me?.fullName?.split(" ")[0]}?
                 </button>
@@ -316,11 +448,11 @@ export default function FeedPage() {
           </div>
           {!posting && (
             <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border">
-              <Button variant="ghost" size="sm" className="flex-1 gap-2 text-muted-foreground" onClick={() => setPosting(true)}>
+              <Button variant="ghost" size="sm" className="flex-1 gap-2 text-muted-foreground" onClick={() => openComposer("image")}>
                 <Image size={16} className="text-green-500" />
                 Photo/Video
               </Button>
-              <Button variant="ghost" size="sm" className="flex-1 gap-2 text-muted-foreground" onClick={() => setPosting(true)}>
+              <Button variant="ghost" size="sm" className="flex-1 gap-2 text-muted-foreground" onClick={() => openComposer()}>
                 <Smile size={16} className="text-yellow-500" />
                 Feeling
               </Button>
