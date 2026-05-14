@@ -1,0 +1,468 @@
+Create an ultra high-quality premium social media mobile application named “SJM” inspired by Facebook, Messenger, Instagram, Threads, and TikTok combined.
+
+The app must be fully functional, production-ready, scalable, secure, optimized, modern, smooth, and visually premium.
+
+========================================
+CORE REQUIREMENTS
+========================================
+
+App Name:
+SJM
+
+Goal:
+Build a complete Facebook-style social media platform with Messenger, Stories, Reels, Marketplace, Video Calls, AI Features, Groups, Pages, and full real-time communication system.
+
+Technology Stack:
+- Flutter latest stable version
+- Firebase backend
+- Firestore database
+- Firebase Authentication
+- Firebase Storage
+- Firebase Cloud Messaging
+- Firebase Functions
+- Riverpod or Provider
+- Clean Architecture
+- MVVM architecture
+- REST API ready
+- WebRTC for calls
+- Material 3 UI
+
+The app must support:
+- Android
+- iPhone (iOS)
+- Tablets
+- Low-end devices
+- Dark mode
+- Light mode
+- Offline caching
+
+========================================
+AUTHENTICATION SYSTEM
+========================================
+
+Create a complete real authentication system.
+
+Include:
+- Email signup/login
+- Phone OTP login
+- Google login
+- Facebook login
+- Apple login
+- Username login
+- Forgot password
+- Password reset
+- Auto login session
+- Remember me
+- Logout system
+- Device login history
+- Multi-device support
+- Two-factor authentication
+
+========================================
+ACCOUNT CREATION SYSTEM
+========================================
+
+Registration fields:
+- Full name
+- Username
+- Email
+- Phone number
+- Password
+- Date of birth
+- Gender
+- Bio
+- Profile image
+- Cover image
+
+Validation:
+- Strong password validation
+- Duplicate username prevention
+- Duplicate email prevention
+- OTP verification
+- Email verification
+- Anti-spam system
+- CAPTCHA support
+- Bot detection
+
+========================================
+USER PROFILE SYSTEM
+========================================
+
+Features:
+- Facebook-style profile
+- Cover photo
+- Bio section
+- Followers/following
+- Friend system
+- Friend requests
+- Profile verification badge
+- Privacy settings
+- Professional mode
+- Creator dashboard
+- Activity history
+
+========================================
+HOME FEED SYSTEM
+========================================
+
+Create a Facebook-style intelligent feed.
+
+Include:
+- Infinite scrolling
+- AI feed recommendation
+- Image posts
+- Video posts
+- Text posts
+- Poll posts
+- GIF posts
+- Feeling/activity posts
+- Hashtag support
+- Mention support
+- Save post
+- Share post
+- Hide post
+- Report post
+
+Reactions:
+- Like
+- Love
+- Haha
+- Wow
+- Sad
+- Angry
+
+Comments:
+- Nested comments
+- Replies
+- Reactions on comments
+- Pin comments
+
+========================================
+POST CREATION SYSTEM
+========================================
+
+Allow users to:
+- Create text posts
+- Upload photos
+- Upload videos
+- Multi-image carousel
+- Add music
+- Add filters
+- Schedule posts
+- Save drafts
+- Add location
+- Tag friends
+- Set audience privacy
+
+========================================
+STORY SYSTEM
+========================================
+
+Implement:
+- 24-hour stories
+- Story music
+- Story reactions
+- Story replies
+- Story viewers list
+- Text stories
+- Story highlights
+- Story privacy
+
+========================================
+REELS SYSTEM
+========================================
+
+Features:
+- Vertical short videos
+- Auto-play reels
+- AI recommendations
+- Trending sounds
+- Video editing tools
+- Filters
+- Effects
+- Music sync
+- Reel monetization
+- Like/comment/share
+
+========================================
+MESSENGER SYSTEM
+========================================
+
+Create a full Messenger clone.
+
+Include:
+- Real-time chat
+- Group chat
+- Secret conversations
+- End-to-end encryption
+- Vanish mode
+- Voice messages
+- HD image sharing
+- File sharing
+- GIFs & stickers
+- Emoji reactions
+- Seen/unseen status
+- Typing indicator
+- Message editing
+- Delete for everyone
+- Reply to message
+- Forward message
+- Search messages
+- Chat themes
+- Chat lock
+- Archived chats
+- Pinned chats
+
+========================================
+FREE AUDIO & VIDEO CALL SYSTEM
+========================================
+
+Implement:
+- Free internet-based voice calls
+- HD video calls
+- Group video calls
+- WebRTC integration
+- Floating call UI
+- Screen sharing
+- Noise cancellation
+- Call recording option
+- Call history
+- Incoming call notifications
+- Low data mode
+- Background call support
+
+========================================
+GROUP SYSTEM
+========================================
+
+Include:
+- Public groups
+- Private groups
+- Anonymous posting
+- Group chats
+- Admin roles
+- Moderator roles
+- Group rules
+- Invite system
+- Group live streaming
+
+========================================
+PAGES SYSTEM
+========================================
+
+Features:
+- Business pages
+- Verified pages
+- Page insights
+- Followers analytics
+- Auto reply bot
+- Monetization support
+- Ads integration
+
+========================================
+MARKETPLACE SYSTEM
+========================================
+
+Implement:
+- Product listing
+- Nearby products
+- Seller profile
+- Product categories
+- Product search
+- Wishlist
+- Ratings & reviews
+- Product chat system
+
+========================================
+SEARCH SYSTEM
+========================================
+
+Global search for:
+- Users
+- Posts
+- Videos
+- Reels
+- Groups
+- Pages
+- Products
+- Hashtags
+
+========================================
+NOTIFICATION SYSTEM
+========================================
+
+Include:
+- Push notifications
+- Message alerts
+- Friend request alerts
+- Likes/comments alerts
+- Call notifications
+- Group notifications
+- Smart filtering
+
+========================================
+AI FEATURES
+========================================
+
+Implement AI:
+- Smart feed recommendation
+- AI captions
+- AI moderation
+- Spam filtering
+- Fake account detection
+- AI assistant chat
+
+========================================
+ADMIN PANEL
+========================================
+
+Create complete admin dashboard:
+- User management
+- Reports management
+- Ban system
+- Analytics
+- Revenue tracking
+- Ads control
+- Content moderation
+
+========================================
+DATABASE STRUCTURE
+========================================
+
+Create collections:
+- users
+- posts
+- reels
+- stories
+- messages
+- calls
+- groups
+- pages
+- products
+- marketplace
+- notifications
+- reports
+
+========================================
+REAL-TIME FEATURES
+========================================
+
+Everything must update instantly:
+- Chats
+- Calls
+- Feed updates
+- Notifications
+- Story views
+- Typing indicators
+
+========================================
+SECURITY SYSTEM
+========================================
+
+Implement:
+- Firebase security rules
+- Token authentication
+- Encrypted messaging
+- Session expiration
+- Device verification
+- Anti-hack protection
+- Anti-spam protection
+- Rate limiting
+- Report/block system
+
+========================================
+UI/UX REQUIREMENTS
+========================================
+
+Design must be:
+- Facebook inspired
+- Messenger inspired
+- Ultra premium
+- Modern
+- Minimal
+- Smooth
+- Fast
+- Responsive
+
+UI Features:
+- Material 3
+- Smooth animations
+- Blur effects
+- Skeleton loading
+- Shimmer effects
+- Bottom navigation
+- Adaptive layouts
+- Gesture navigation
+
+========================================
+BUG FIXING REQUIREMENTS
+========================================
+
+Fix ALL Flutter issues:
+
+- No Hero tag conflicts
+- No RenderFlex overflow
+- No Bottom overflow
+- No keyboard overflow
+- No null check crashes
+- No red error screens
+- No deprecated widgets
+- No lagging UI
+- No memory leaks
+- No Firebase initialization errors
+
+========================================
+CUSTOMPAINTER & RENDERING
+========================================
+
+All CustomPainter and rendering systems must work perfectly.
+
+Fix:
+- Paint overflow
+- Clipping bugs
+- Animation lag
+- Gradient rendering issues
+- Layer rendering problems
+
+Ensure:
+- GPU optimized rendering
+- Smooth scrolling
+- High FPS animations
+- Perfect adaptive layouts
+
+========================================
+PERFORMANCE OPTIMIZATION
+========================================
+
+Optimize:
+- Lazy loading
+- Image compression
+- API caching
+- Database indexing
+- Memory usage
+- Battery usage
+- Fast startup
+- Offline storage
+
+========================================
+DELIVERABLES
+========================================
+
+Generate:
+- Complete Flutter source code
+- Firebase setup
+- Database schema
+- Models
+- Controllers
+- Services
+- APIs
+- Full folder structure
+- Admin panel
+- README
+- APK build instructions
+
+========================================
+FINAL RESULT
+========================================
+
+The final application must look and behave like a world-class premium Facebook-style platform named “SJM” with fully working authentication, Messenger, Stories, Reels, Marketplace, AI systems, HD video calls, real-time chat, and production-level performance with zero UI bugs and complete backend integration.
